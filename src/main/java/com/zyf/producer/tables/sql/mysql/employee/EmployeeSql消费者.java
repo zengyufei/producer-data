@@ -9,6 +9,7 @@ import com.zyf.producer.tables.sql.mysql.MySql的Sql运行上下文;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 public class EmployeeSql消费者 extends 公共Sql消费者<MySql的Sql运行上下文> {
@@ -25,11 +26,11 @@ public class EmployeeSql消费者 extends 公共Sql消费者<MySql的Sql运行�
             log.debug("{} 执行消费, {}", this, context);
         }
 
-        final Entity employee = context.getEmployee();
+        final Entity oldObj = context.getEmployee();
         List<Entity> list = EMPLOYEE.getParents(context);
 
         Entity newObj = null;
-        if (employee != null || CollUtil.isNotEmpty(list)) {
+        if (oldObj != null || CollUtil.isNotEmpty(list)) {
             newObj = EMPLOYEE.createNew();
             EMPLOYEE.setRef(context, newObj);
         }
@@ -37,7 +38,7 @@ public class EmployeeSql消费者 extends 公共Sql消费者<MySql的Sql运行�
         if (newObj != null) {
             // 数据库写入
             this.写入数据库(newObj);
-            context.setEmployee(newObj);
+            EMPLOYEE.sendContext(context, Optional.of(newObj));
             return true;
         }
         return false;
