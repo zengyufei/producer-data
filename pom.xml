@@ -117,7 +117,7 @@
                     <archive>
                         <manifest>
                             <addClasspath>true</addClasspath>
-                            <mainClass>com.zyf.producer.Tenant运行总获产</mainClass>
+                            <mainClass>com.zyf.producer.TenantBean运行总获产</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>
