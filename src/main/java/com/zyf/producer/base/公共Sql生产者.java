@@ -1,21 +1,30 @@
 package com.zyf.producer.base;
 
-import cn.hutool.core.date.StopWatch;
 import com.lmax.disruptor.RingBuffer;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
-public abstract class 公共生产者<T extends BaseContext> {
+public abstract class 公共Sql生产者<T extends BaseSqlContext> {
     public static final AtomicBoolean isDonePrint = new AtomicBoolean(false);
     public final static AtomicBoolean isDone = new AtomicBoolean(false);
     @Getter
     @Setter
     protected RingBuffer<T> ringBuffer;
+
+    public static void jucBool(AtomicBoolean value, Runnable runnable) {
+        if (!value.get()) {
+            synchronized (value) {
+                if (!value.get()) {
+                    runnable.run();
+                    value.set(true);
+                }
+            }
+        }
+    }
 
     public 状态 生产数据(int seqNo) throws Exception {
         long nextSeq = ringBuffer.next();
@@ -64,17 +73,6 @@ public abstract class 公共生产者<T extends BaseContext> {
             return status;
         } catch (Exception e) {
             throw new RuntimeException(e);
-        }
-    }
-
-    public static void jucBool(AtomicBoolean value, Runnable runnable) {
-        if (!value.get()) {
-            synchronized (value) {
-                if (!value.get()) {
-                    runnable.run();
-                    value.set(true);
-                }
-            }
         }
     }
 

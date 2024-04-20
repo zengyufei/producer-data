@@ -3,8 +3,7 @@ package com.zyf.producer.enums;
 public enum DbType {
 
     DEFAULT("default"),
-    MYSQL("mysql")
-    ;
+    MYSQL("mysql");
 
     private final String key;
 

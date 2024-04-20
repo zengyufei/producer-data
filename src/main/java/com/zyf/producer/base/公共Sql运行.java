@@ -30,15 +30,45 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 @Slf4j
-public class 公共运行<T extends BaseContext, S extends 公共生产者<T>> {
+public class 公共Sql运行<T extends BaseSqlContext, S extends 公共Sql生产者<T>> {
 
     protected final static int producerCount = 20;
     protected final static AtomicInteger producerCounter = new AtomicInteger(1);
+    protected static volatile int total = 1;
     protected final ThreadPoolExecutor producerPool = PoolUtil.getProducerPoolExecutorService(producerCount);
     protected final ThreadPoolExecutor consumerPool = PoolUtil.getConsumerPoolExecutorService(2);
-    protected static volatile int total = 1;
 
-    public void 执行(String[] args, Supplier<S> producerSupplier, Supplier<T> beanSupplier, Consumer<执行方式<T>> consumer) throws InterruptedException {
+    public static <T extends 公共Sql消费者> T[] 创建消费者数组(int size, AtomicInteger counter, Supplier<T> supplier) {
+        final T t = supplier.get();
+        T[] consumers = (T[]) Array.newInstance(t.getClass(), size);
+        List<Thread> threads = new ArrayList<>();
+        for (int i = 0; i < size; i++) {
+            if (i == 0) {
+                t.setConsumerCounter(counter); // 假设每个消费者都有一个设置计数器的方法
+                consumers[i] = t;
+            }
+            if (i != 0) {
+                int finalI = i;
+                final Thread thread = new Thread(() -> {
+                    T consumer = supplier.get(); // 使用供应商创建新实例
+                    consumer.setConsumerCounter(counter); // 假设每个消费者都有一个设置计数器的方法
+                    consumers[finalI] = consumer;
+                });
+                threads.add(thread);
+                thread.start();
+            }
+        }
+        for (Thread thread : threads) {
+            try {
+                thread.join();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return consumers;
+    }
+
+    public void 执行(String[] args, Supplier<S> producerSupplier, Supplier<T> beanSupplier, Consumer<Sql执行方式<T>> consumer) throws InterruptedException {
         loadConfig();
 
         // 因为随机数工具需要加载耗时7s，所以用多线程提前加载
@@ -56,7 +86,7 @@ public class 公共运行<T extends BaseContext, S extends 公共生产者<T>> {
         System.out.println("花费总时长: " + stopWatch.getTotalTimeMillis());
     }
 
-    private void 最终执行(Supplier<S> producerSupplier, Supplier<T> beanSupplier, Consumer<执行方式<T>> consumer) throws InterruptedException {
+    private void 最终执行(Supplier<S> producerSupplier, Supplier<T> beanSupplier, Consumer<Sql执行方式<T>> consumer) throws InterruptedException {
         AtomicBoolean isProducerStopped = new AtomicBoolean(false);
         AtomicBoolean isConsumerStopped = new AtomicBoolean(false);
         try {
@@ -114,7 +144,7 @@ public class 公共运行<T extends BaseContext, S extends 公共生产者<T>> {
                             if (count <= total) {
                                 producerCounter.incrementAndGet();
                             } else {
-                                公共生产者.isDone.set(true);
+                                公共Sql生产者.isDone.set(true);
                                 log.info("退出生产, 生产到达最大值: {}条!", total);
                                 break;
                             }
@@ -128,13 +158,13 @@ public class 公共运行<T extends BaseContext, S extends 公共生产者<T>> {
                             final 状态 status = producer.生产数据(seqNo);
                             if (status == 状态.push) {
                                 synchronized (producerCounter) {
-                                    final int count = producerCounter.get();
+                                    final int count = producerCounter.get()-1;
                                     log.info("生产第{}条数据!", count);
                                 }
                             }
                             if (status == 状态.stop) {
                                 log.info("status == 状态.stop, 将停止生产!");
-                                公共生产者.isDone.set(true);
+                                公共Sql生产者.isDone.set(true);
                                 break;
                             }
                             if (status == 状态.none) {
@@ -201,37 +231,5 @@ public class 公共运行<T extends BaseContext, S extends 公共生产者<T>> {
         } else {
             log.info("从classpath读取配置文件: {}", "db.setting");
         }
-    }
-
-
-
-    public static <T extends 公共消费者> T[] 创建消费者数组(int size, AtomicInteger counter, Supplier<T> supplier) {
-        final T t = supplier.get();
-        T[] consumers = (T[]) Array.newInstance(t.getClass(), size);
-        List<Thread> threads = new ArrayList<>();
-        for (int i = 0; i < size; i++) {
-            if (i == 0) {
-                t.setConsumerCounter(counter); // 假设每个消费者都有一个设置计数器的方法
-                consumers[i] = t;
-            }
-            if (i != 0) {
-                int finalI = i;
-                final Thread thread = new Thread(() -> {
-                    T consumer = supplier.get(); // 使用供应商创建新实例
-                    consumer.setConsumerCounter(counter); // 假设每个消费者都有一个设置计数器的方法
-                    consumers[finalI] = consumer;
-                });
-                threads.add(thread);
-                thread.start();
-            }
-        }
-        for (Thread thread : threads) {
-            try {
-                thread.join();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }
-        return consumers;
     }
 }

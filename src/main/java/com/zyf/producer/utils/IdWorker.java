@@ -15,31 +15,36 @@ import java.util.concurrent.atomic.AtomicLong;
 public class IdWorker {
 
 
+    private static final IdWorker instance;
+
+    static {
+        instance = new IdWorkerHolder().getInstance();
+    }
+
     /**
      * Start time cut (2020-05-03)
      */
     private final long twepoch = 1588435200000L;
-
     /**
      * The number of bits occupied by workerId
      */
     private final int workerIdBits = 10;
-
     /**
      * The number of bits occupied by timestamp
      */
     private final int timestampBits = 41;
-
     /**
      * The number of bits occupied by sequence
      */
     private final int sequenceBits = 12;
-
     /**
      * Maximum supported machine id, the result is 1023
      */
     private final int maxWorkerId = ~(-1 << workerIdBits);
-
+    /**
+     * mask that help to extract timestamp and sequence from a long
+     */
+    private final long timestampAndSequenceMask = ~(-1L << (timestampBits + sequenceBits));
     /**
      * business meaning: machine ID (0 ~ 1023)
      * actual layout in memory:
@@ -48,7 +53,6 @@ public class IdWorker {
      * lowest 53 bit: all 0
      */
     private long workerId;
-
     /**
      * timestamp and sequence mix in one Long
      * highest 11 bit: not used
@@ -58,26 +62,6 @@ public class IdWorker {
     private AtomicLong timestampAndSequence;
 
     /**
-     * mask that help to extract timestamp and sequence from a long
-     */
-    private final long timestampAndSequenceMask = ~(-1L << (timestampBits + sequenceBits));
-
-
-    private static final IdWorker instance;
-
-    static {
-        instance = new IdWorkerHolder().getInstance();
-    }
-
-    private static class IdWorkerHolder {
-        private final IdWorker instance = new IdWorker(null);
-
-        public IdWorker getInstance() {
-            return instance;
-        }
-    }
-
-    /**
      * instantiate an IdWorker using given workerId
      *
      * @param workerId if null, then will auto assign one
@@ -85,31 +69,6 @@ public class IdWorker {
     private IdWorker(Long workerId) {
         initTimestampAndSequence();
         initWorkerId(workerId);
-    }
-
-    /**
-     * init first timestamp and sequence immediately
-     */
-    private void initTimestampAndSequence() {
-        long timestamp = getNewestTimestamp();
-        long timestampWithSequence = timestamp << sequenceBits;
-        this.timestampAndSequence = new AtomicLong(timestampWithSequence);
-    }
-
-    /**
-     * init workerId
-     *
-     * @param workerId if null, then auto generate one
-     */
-    private void initWorkerId(Long workerId) {
-        if (workerId == null) {
-            workerId = generateWorkerId();
-        }
-        if (workerId > maxWorkerId || workerId < 0) {
-            String message = String.format("worker Id can't be greater than %d or less than 0", maxWorkerId);
-            throw new IllegalArgumentException(message);
-        }
-        this.workerId = workerId << (timestampBits + sequenceBits);
     }
 
     /**
@@ -136,6 +95,31 @@ public class IdWorker {
      */
     public static long getNextId() {
         return instance.nextId();
+    }
+
+    /**
+     * init first timestamp and sequence immediately
+     */
+    private void initTimestampAndSequence() {
+        long timestamp = getNewestTimestamp();
+        long timestampWithSequence = timestamp << sequenceBits;
+        this.timestampAndSequence = new AtomicLong(timestampWithSequence);
+    }
+
+    /**
+     * init workerId
+     *
+     * @param workerId if null, then auto generate one
+     */
+    private void initWorkerId(Long workerId) {
+        if (workerId == null) {
+            workerId = generateWorkerId();
+        }
+        if (workerId > maxWorkerId || workerId < 0) {
+            String message = String.format("worker Id can't be greater than %d or less than 0", maxWorkerId);
+            throw new IllegalArgumentException(message);
+        }
+        this.workerId = workerId << (timestampBits + sequenceBits);
     }
 
     /**
@@ -219,5 +203,13 @@ public class IdWorker {
      */
     private long generateRandomWorkerId() {
         return new Random().nextInt(maxWorkerId + 1);
+    }
+
+    private static class IdWorkerHolder {
+        private final IdWorker instance = new IdWorker(null);
+
+        public IdWorker getInstance() {
+            return instance;
+        }
     }
 }

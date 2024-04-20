@@ -10,7 +10,7 @@ import java.lang.reflect.Field;
  * 抽象实体
  */
 @Data
-public class BaseContext implements Serializable {
+public class BaseSqlContext implements Serializable {
     private boolean isDone;
 
     public void clear() {

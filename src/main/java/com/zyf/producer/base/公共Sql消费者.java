@@ -1,7 +1,6 @@
 package com.zyf.producer.base;
 
 import cn.hutool.core.util.RandomUtil;
-import cn.hutool.core.util.ReflectUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.db.Db;
 import cn.hutool.db.Entity;
@@ -25,17 +24,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
-public abstract class 公共消费者<T extends BaseContext> implements WorkHandler<T>, EventHandler<T>, LifecycleAware {
-
-    private static volatile boolean isMock = false;
+public abstract class 公共Sql消费者<T extends BaseSqlContext> implements WorkHandler<T>, EventHandler<T>, LifecycleAware {
 
     public static final AtomicBoolean isPrintError = new AtomicBoolean(false);
     public static final AtomicBoolean isDonePrint = new AtomicBoolean(false);
+    protected final static Map<Class, Db> dbMap = new ConcurrentHashMap<>();
+    private static volatile boolean isMock = false;
     public final AtomicBoolean isInit = new AtomicBoolean(false);
     // 如果使用 synchronized (this) 是可以使用hashMap的
     protected final Map<String, String> propertyByColumnNameMap = new HashMap<>();
-    protected final static Map<Class, Db> dbMap = new ConcurrentHashMap<>();
     protected final Set<String> propertys = new HashSet<>();
+    private final ThreadLocal<Integer> countThreadLocal = new TransmittableThreadLocal<>();
     @Setter
     @Getter
     protected AtomicInteger consumerCounter = new AtomicInteger(1);
@@ -43,9 +42,8 @@ public abstract class 公共消费者<T extends BaseContext> implements WorkHand
     protected volatile Entity entity;
     protected volatile String key;
     private volatile Db db;
-    private final ThreadLocal<Integer> countThreadLocal = new TransmittableThreadLocal<>();
 
-    public 公共消费者() {
+    public 公共Sql消费者() {
         if (db == null) {
             synchronized (this.getClass()) {
                 if (db == null) {
@@ -109,56 +107,20 @@ public abstract class 公共消费者<T extends BaseContext> implements WorkHand
         return null;
     }
 
-    protected <R> void 写入数据库(R r) {
-        写入数据库(null, r);
-    }
-
-    protected <R> void 写入数据库(String inputTableName, R r) {
+    protected Entity 写入数据库(Entity entity) {
+        final String entityTableName = entity.getTableName();
         final Integer count = countThreadLocal.get();
-        final String simpleName = r.getClass().getSimpleName();
         if (log.isDebugEnabled()) {
-            log.debug("第{}条, 调用 写入数据库!!", count);
+            log.debug("{} 第{}条, 调用 写入数据库!!", entityTableName, count);
         }
 
-        // 因为本身会被并发调用，导致此处重复并发，修改propertys与循环propertys同时执行导致报错
-        if (!isInit.get()) {
-            synchronized (this) {
-                if (!isInit.get()) {
-                    if (log.isDebugEnabled()) {
-                        log.debug("{} 结构解析开始...", simpleName);
-                    }
-                    final Class<?> rClass = r.getClass();
-                    if (inputTableName == null) {
-                        this.tableName = CommonUtil.getEntityTableName(rClass);
-                    }
-                    if (entity == null) {
-                        entity = Entity.create(this.tableName);
-                    }
-                    entity = Entity.create(this.tableName);
-                    CommonUtil.consumerFields(rClass, (fieldName, columnName) -> {
-                        propertyByColumnNameMap.put(fieldName, columnName);
-                        propertys.add(fieldName);
-                    });
-                    isInit.set(true);
-                    if (log.isDebugEnabled()) {
-                        log.debug("{} 结构解析完成!!", simpleName);
-                    }
-                }
-            }
-        }
-
-        for (String property : propertys) {
-            final String colunmName = propertyByColumnNameMap.get(property);
-            final Object fieldValue = ReflectUtil.getFieldValue(r, property);
-            entity.set(colunmName, fieldValue);
-        }
         try {
             if (log.isDebugEnabled()) {
-                log.debug("{} 第{}条, 执行新增操作...", simpleName, count);
+                log.debug("{} 第{}条, 执行新增操作...", entityTableName, count);
             }
             db.insert(entity);
             if (log.isDebugEnabled()) {
-                log.debug("{} 第{}条, 执行完毕!", simpleName, count);
+                log.debug("{} 第{}条, 执行完毕!", entityTableName, count);
             }
         } catch (SQLException e) {
             throw new RuntimeException(e);
@@ -171,6 +133,7 @@ public abstract class 公共消费者<T extends BaseContext> implements WorkHand
                 throw new RuntimeException(e);
             }
         }
+        return entity;
     }
 
     @Override

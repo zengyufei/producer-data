@@ -3,6 +3,7 @@ package com.zyf.producer.base;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.db.Db;
+import cn.hutool.db.Entity;
 import cn.hutool.db.handler.HandleHelper;
 import lombok.extern.slf4j.Slf4j;
 
@@ -19,12 +20,12 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 @Slf4j
-public abstract class Sql生产者<T extends BaseContext> extends 公共生产者<T> {
+public abstract class Sql获产者<T extends BaseSqlContext> extends 公共Sql生产者<T> {
 
     private static volatile boolean isMock = false;
     protected final BlockingQueue<T> contextQueue = new ArrayBlockingQueue<>(1000);
 
-    public <S> void 流式查询数据(Db db, String sql, int rate, Class<S> clazz, Function<S, T> consumer) throws Exception {
+    public void 流式查询数据(Db db, String sql, int rate, Function<Entity, T> consumer) throws Exception {
         AtomicInteger size = new AtomicInteger(0);
         CountDownLatch cd = new CountDownLatch(1);
         final Thread thread = new Thread(() -> {
@@ -48,8 +49,8 @@ public abstract class Sql生产者<T extends BaseContext> extends 公共生产�
                                 log.debug("游标查询第{}条数据", i);
                             }
                             // 处理每条记录
-                            final S s = HandleHelper.handleRow(columnCount, meta, resultSet, clazz);
-                            final T t = consumer.apply(s);
+                            final Entity entity = HandleHelper.handleRow(columnCount, meta, resultSet, Entity.class);
+                            final T t = consumer.apply(entity);
                             推值(t);
                             if (isDone.get()) {
                                 log.info("数据库查询执行完毕!!!");
